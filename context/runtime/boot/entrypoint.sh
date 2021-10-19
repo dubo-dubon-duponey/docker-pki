@@ -12,7 +12,7 @@ helpers::dir::writable /tmp
 helpers::dir::writable /data
 
 # mDNS blast if asked to
-[ ! "$MDNS_HOST" ] || {
+[ ! "${MDNS_HOST:-}" ] || {
   [ ! "${MDNS_STATION:-}" ] || mdns::add "_workstation._tcp" "$MDNS_HOST" "${MDNS_NAME:-}" "$PORT"
   mdns::add "${MDNS_TYPE:-_http._tcp}" "$MDNS_HOST" "${MDNS_NAME:-}" "$PORT"
   mdns::start &
