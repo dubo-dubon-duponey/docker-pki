@@ -184,7 +184,8 @@ RUN           export GOARM="$(printf "%s" "$TARGETVARIANT" | tr -d v)"; \
 #######################
 # Builder assembly
 #######################
-FROM          --platform=$BUILDPLATFORM $FROM_REGISTRY/$FROM_IMAGE_AUDITOR                                              AS builder
+#FROM          --platform=$BUILDPLATFORM $FROM_REGISTRY/$FROM_IMAGE_AUDITOR                                              AS builder
+FROM          $FROM_REGISTRY/$FROM_IMAGE_AUDITOR                                              AS builder
 
 RUN           --mount=type=secret,uid=100,id=CA \
               --mount=type=secret,uid=100,id=CERTIFICATE \
@@ -211,7 +212,6 @@ COPY          --from=builder-step-cli        /dist /dist
 
 RUN           patchelf --set-rpath '/boot/lib' /dist/boot/bin/step-ca
 RUN           setcap 'cap_net_bind_service+ep' /dist/boot/bin/step-ca
-
 RUN           cp /usr/sbin/avahi-daemon                 /dist/boot/bin
 RUN           setcap 'cap_chown+ei cap_dac_override+ei' /dist/boot/bin/avahi-daemon
 
@@ -235,7 +235,7 @@ RUN           --mount=type=secret,uid=100,id=CA \
               --mount=type=secret,id=APT_SOURCES \
               --mount=type=secret,id=APT_CONFIG \
               apt-get update -qq && apt-get install -qq --no-install-recommends \
-                libnss-mdns=0.14.1-2 && \
+                  libnss-mdns=0.14.1-2 && \
               apt-get -qq autoremove      && \
               apt-get -qq clean           && \
               rm -rf /var/lib/apt/lists/* && \
@@ -243,7 +243,7 @@ RUN           --mount=type=secret,uid=100,id=CA \
               rm -rf /var/tmp/*
 
 # Deviate avahi temporary files into /tmp (there is a socket, so, probably need exec)
-RUN           ln -s /tmp/avahi-daemon /run
+RUN           ln -s $XDG_STATE_HOME/avahi-daemon /run
 
 # Not convinced this is necessary
 # sed -i "s/hosts:.*/hosts:          files mdns4 dns/g" /etc/nsswitch.conf \

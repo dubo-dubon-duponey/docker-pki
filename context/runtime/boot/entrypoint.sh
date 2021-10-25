@@ -13,12 +13,10 @@ helpers::dir::writable /data
 
 # mDNS blast if asked to
 [ ! "${MDNS_HOST:-}" ] || {
-  [ ! "${MDNS_STATION:-}" ] || mdns::add "_workstation._tcp" "$MDNS_HOST" "${MDNS_NAME:-}" "$PORT"
-  mdns::add "${MDNS_TYPE:-_http._tcp}" "$MDNS_HOST" "${MDNS_NAME:-}" "$PORT"
-  mdns::start &
+  [ ! "${MDNS_STATION:-}" ] || mdns::records::add "_workstation._tcp" "$MDNS_HOST" "${MDNS_NAME:-}" "$PORT"
+  mdns::records::add "${MDNS_TYPE:-_http._tcp}" "$MDNS_HOST" "${MDNS_NAME:-}" "$PORT"
+  mdns::records::broadcast &
 }
-
-helpers::dir::writable "/tmp/avahi-daemon" create
 
 export STEPPATH=/data/step
 
@@ -48,8 +46,6 @@ step::root::fingerprint(){
 #  step ca init --deployment-type=standalone --name "$CA_NAME" --dns "$MDNS_HOST".local --address=:"$PORT" --provisioner=$PROVISIONER --password-file <(echo -n "$PROVISIONER_PASSWORD")
 }
 
-[ "${MDNS_NSS_ENABLED:-}" != true ] || {
-  avahi-daemon -f /config/avahi.conf --daemonize --no-drop-root --no-chroot --debug
-}
+[ "${MDNS_NSS_ENABLED:-}" != true ] || mdns::resolver::start
 
 exec step-ca "$(step path)"/config/ca.json --password-file <(echo -n "$PROVISIONER_PASSWORD") "$@"
