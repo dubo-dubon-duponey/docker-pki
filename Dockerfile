@@ -1,23 +1,25 @@
 ARG           FROM_REGISTRY=ghcr.io/dubo-dubon-duponey
 
-ARG           FROM_IMAGE_BUILDER=base:builder-bullseye-2021-10-15@sha256:1609d1af44c0048ec0f2e208e6d4e6a525c6d6b1c0afcc9d71fccf985a8b0643
-ARG           FROM_IMAGE_AUDITOR=base:auditor-bullseye-2021-10-15@sha256:2c95e3bf69bc3a463b00f3f199e0dc01cab773b6a0f583904ba6766b3401cb7b
-ARG           FROM_IMAGE_RUNTIME=base:runtime-bullseye-2021-10-15@sha256:5c54594a24e3dde2a82e2027edd6d04832204157e33775edc66f716fa938abba
-ARG           FROM_IMAGE_TOOLS=tools:linux-bullseye-2021-10-15@sha256:4de02189b785c865257810d009e56f424d29a804cc2645efb7f67b71b785abde
+ARG           FROM_IMAGE_BUILDER=base:builder-bullseye-2022-04-01@sha256:d73bb6ea84152c42e314bc9bff6388d0df6d01e277bd238ee0e6f8ade721856d
+ARG           FROM_IMAGE_AUDITOR=base:auditor-bullseye-2022-04-01@sha256:ca513bf0219f654afeb2d24aae233fef99cbcb01991aea64060f3414ac792b3f
+ARG           FROM_IMAGE_RUNTIME=base:runtime-bullseye-2022-04-01@sha256:6456b76dd2eedf34b4c5c997f9ad92901220dfdd405ec63419d0b54b6d85a777
+ARG           FROM_IMAGE_TOOLS=tools:linux-bullseye-2022-04-01@sha256:323f3e36da17d8638a07a656e2f17d5ee4dc2b17dfea7e2da36e1b2174cc5f18
 
 FROM          $FROM_REGISTRY/$FROM_IMAGE_TOOLS                                                                          AS builder-tools
 
 FROM          --platform=$BUILDPLATFORM $FROM_REGISTRY/$FROM_IMAGE_BUILDER                                              AS fetcher-certstrap
 
 ARG           GIT_REPO=github.com/square/certstrap
-ARG           GIT_VERSION=1768704
-ARG           GIT_COMMIT=17687043c6aa40489620cfba2d6350d586cda8ed
+#ARG           GIT_VERSION=ccb7865
+#ARG           GIT_COMMIT=ccb7865014575cdc785d931e950e899eac7841fd
+ARG           GIT_VERSION=2a55ac3
+ARG           GIT_COMMIT=2a55ac31269d6b6390776d3ac22d16e5ff8e1172
 
 ENV           WITH_BUILD_SOURCE="."
 ENV           WITH_BUILD_OUTPUT="certstrap"
 ENV           WITH_LDFLAGS=""
 
-RUN           git clone --recurse-submodules git://"$GIT_REPO" .; git checkout "$GIT_COMMIT"
+RUN           git clone --recurse-submodules https://"$GIT_REPO" .; git checkout "$GIT_COMMIT"
 RUN           --mount=type=secret,id=CA \
               --mount=type=secret,id=NETRC \
               [[ "${GOFLAGS:-}" == *-mod=vendor* ]] || go mod download
@@ -25,8 +27,8 @@ RUN           --mount=type=secret,id=CA \
 FROM          --platform=$BUILDPLATFORM $FROM_REGISTRY/$FROM_IMAGE_BUILDER                                              AS fetcher-step
 
 ARG           GIT_REPO=github.com/smallstep/certificates
-ARG           GIT_VERSION=v0.17.4
-ARG           GIT_COMMIT=afe1980d139a8f0a2b6212c69fae8fa4d94666c4
+ARG           GIT_VERSION=v0.18.2
+ARG           GIT_COMMIT=bf8155f9bd3fc374f401fbb29c52b1289207face
 
 ENV           WITH_BUILD_SOURCE="./cmd/step-ca"
 ENV           WITH_BUILD_OUTPUT="step-ca"
@@ -35,7 +37,7 @@ ENV           WITH_LDFLAGS="-X main.Version=${GIT_VERSION} -X main.BuildTime=${B
 ENV           CGO_ENABLED=1
 ENV           WITH_CGO_NET=true
 
-RUN           git clone --recurse-submodules git://"$GIT_REPO" .; git checkout "$GIT_COMMIT"
+RUN           git clone --recurse-submodules https://"$GIT_REPO" .; git checkout "$GIT_COMMIT"
 
 RUN           echo "replace github.com/micromdm/scep/v2 v2.0.0 => github.com/micromdm/scep/v2 v2.1.0" >> go.mod
 RUN           --mount=type=secret,id=CA \
@@ -65,8 +67,8 @@ RUN           --mount=type=secret,uid=100,id=CA \
 FROM          --platform=$BUILDPLATFORM $FROM_REGISTRY/$FROM_IMAGE_BUILDER                                              AS fetcher-step-cli
 
 ARG           GIT_REPO=github.com/smallstep/cli
-ARG           GIT_VERSION=v0.17.6
-ARG           GIT_COMMIT=e59c7f60ddb041b4211138884a899cdceb1dffef
+ARG           GIT_VERSION=v0.18.2
+ARG           GIT_COMMIT=93151e282d022f2a01513254de1a8a4768609c8e
 
 ENV           WITH_BUILD_SOURCE="./cmd/step"
 ENV           WITH_BUILD_OUTPUT="step"
@@ -75,7 +77,7 @@ ENV           WITH_LDFLAGS="-X main.Version=${GIT_VERSION} -X main.BuildTime=${B
 ENV           CGO_ENABLED=1
 ENV           WITH_CGO_NET=true
 
-RUN           git clone --recurse-submodules git://"$GIT_REPO" .; git checkout "$GIT_COMMIT"
+RUN           git clone --recurse-submodules https://"$GIT_REPO" .; git checkout "$GIT_COMMIT"
 
 RUN           echo "replace github.com/micromdm/scep/v2 v2.0.0 => github.com/micromdm/scep/v2 v2.1.0" >> go.mod
 RUN           --mount=type=secret,id=CA \
@@ -243,7 +245,7 @@ RUN           --mount=type=secret,uid=100,id=CA \
               rm -rf /var/tmp/*
 
 # Deviate avahi temporary files into /tmp (there is a socket, so, probably need exec)
-RUN           ln -s $XDG_STATE_HOME/avahi-daemon /run
+RUN           ln -s "$XDG_STATE_HOME"/avahi-daemon /run
 
 # Not convinced this is necessary
 # sed -i "s/hosts:.*/hosts:          files mdns4 dns/g" /etc/nsswitch.conf \
@@ -266,8 +268,6 @@ ENV           LOG_LEVEL="warn"
 ENV           DOMAIN="$_SERVICE_NICK.local"
 ENV           ADDITIONAL_DOMAINS=""
 
-# Whether the server should behave as a proxy (disallows mTLS)
-ENV           SERVER_NAME="DuboDubonDuponey/1.0 (Caddy/2) [$_SERVICE_NICK]"
 
 # Control wether tls is going to be "internal" (eg: self-signed), or alternatively an email address to enable letsencrypt
 # XXX disable by default for now until:
@@ -276,12 +276,10 @@ ENV           SERVER_NAME="DuboDubonDuponey/1.0 (Caddy/2) [$_SERVICE_NICK]"
 # - figure out performance impact of TLS over buildtime
 ENV           TLS=""
 # "internal"
-# 1.2 or 1.3
-ENV           TLS_MIN=1.2
 # Either require_and_verify or verify_if_given
 ENV           MTLS_ENABLED=true
 ENV           MTLS_MODE="verify_if_given"
-ENV           MTLS_TRUST="/certs/pki/authorities/local/root.crt"
+ENV           ADVANCED_MTLS_TRUST="/certs/pki/authorities/local/root.crt"
 # Issuer name to appear in certificates
 #ENV           TLS_ISSUER="Dubo Dubon Duponey"
 # Either disable_redirects or ignore_loaded_certs if one wants the redirects
@@ -295,6 +293,8 @@ ENV           AUTH_USERNAME="dubo-dubon-duponey"
 ENV           AUTH_PASSWORD="cmVwbGFjZV9tZV93aXRoX3NvbWV0aGluZwo="
 
 ### mDNS broadcasting
+# Whether to enable MDNS broadcasting or not
+ENV           MDNS_ENABLED=true
 # Type to advertise
 ENV           MDNS_TYPE="_$_SERVICE_TYPE._tcp"
 # Name is used as a short description for the service
