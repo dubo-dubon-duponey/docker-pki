@@ -1,19 +1,17 @@
-ARG           FROM_REGISTRY=ghcr.io/dubo-dubon-duponey
+ARG           FROM_REGISTRY=docker.io/dubodubonduponey
 
-ARG           FROM_IMAGE_BUILDER=base:builder-bullseye-2022-04-01@sha256:d73bb6ea84152c42e314bc9bff6388d0df6d01e277bd238ee0e6f8ade721856d
-ARG           FROM_IMAGE_AUDITOR=base:auditor-bullseye-2022-04-01@sha256:ca513bf0219f654afeb2d24aae233fef99cbcb01991aea64060f3414ac792b3f
-ARG           FROM_IMAGE_RUNTIME=base:runtime-bullseye-2022-04-01@sha256:6456b76dd2eedf34b4c5c997f9ad92901220dfdd405ec63419d0b54b6d85a777
-ARG           FROM_IMAGE_TOOLS=tools:linux-bullseye-2022-04-01@sha256:323f3e36da17d8638a07a656e2f17d5ee4dc2b17dfea7e2da36e1b2174cc5f18
+ARG           FROM_IMAGE_BUILDER=base:builder-bookworm-2024-02-20
+ARG           FROM_IMAGE_AUDITOR=base:auditor-bookworm-2024-02-20
+ARG           FROM_IMAGE_RUNTIME=base:runtime-bookworm-2024-02-20
+ARG           FROM_IMAGE_TOOLS=tools:linux-bookworm-2024-02-20
 
 FROM          $FROM_REGISTRY/$FROM_IMAGE_TOOLS                                                                          AS builder-tools
 
 FROM          --platform=$BUILDPLATFORM $FROM_REGISTRY/$FROM_IMAGE_BUILDER                                              AS fetcher-certstrap
 
 ARG           GIT_REPO=github.com/square/certstrap
-#ARG           GIT_VERSION=ccb7865
-#ARG           GIT_COMMIT=ccb7865014575cdc785d931e950e899eac7841fd
-ARG           GIT_VERSION=2a55ac3
-ARG           GIT_COMMIT=2a55ac31269d6b6390776d3ac22d16e5ff8e1172
+ARG           GIT_VERSION=762223e
+ARG           GIT_COMMIT=762223eda04d77ee4e2fc9cf9518b7b457af687b
 
 ENV           WITH_BUILD_SOURCE="."
 ENV           WITH_BUILD_OUTPUT="certstrap"
@@ -27,8 +25,8 @@ RUN           --mount=type=secret,id=CA \
 FROM          --platform=$BUILDPLATFORM $FROM_REGISTRY/$FROM_IMAGE_BUILDER                                              AS fetcher-step
 
 ARG           GIT_REPO=github.com/smallstep/certificates
-ARG           GIT_VERSION=v0.18.2
-ARG           GIT_COMMIT=bf8155f9bd3fc374f401fbb29c52b1289207face
+ARG           GIT_VERSION=v0.25.2
+ARG           GIT_COMMIT=7bfe11c68723194a583108e6cf984573459bda1e
 
 ENV           WITH_BUILD_SOURCE="./cmd/step-ca"
 ENV           WITH_BUILD_OUTPUT="step-ca"
@@ -42,7 +40,7 @@ RUN           git clone --recurse-submodules https://"$GIT_REPO" .; git checkout
 RUN           echo "replace github.com/micromdm/scep/v2 v2.0.0 => github.com/micromdm/scep/v2 v2.1.0" >> go.mod
 RUN           --mount=type=secret,id=CA \
               --mount=type=secret,id=NETRC \
-              go mod tidy
+              go mod tidy -compat=1.17
 #              sed -Ei 's/scep\/v2 v2.0.0/scep\/v2 v2.1.0/g' go.mod; go mod tidy
 
 RUN           --mount=type=secret,id=CA \
@@ -58,17 +56,17 @@ RUN           --mount=type=secret,uid=100,id=CA \
               --mount=type=secret,id=APT_SOURCES \
               --mount=type=secret,id=APT_CONFIG \
               apt-get update -qq; \
-              apt-get install -qq --no-install-recommends ninja-build=1.10.1-1; \
-              for architecture in armel armhf arm64 ppc64el i386 s390x amd64; do \
+              apt-get install -qq --no-install-recommends ninja-build=1.11.1-1; \
+              for architecture in arm64 amd64; do \
                 apt-get install -qq --no-install-recommends \
-                  libpcsclite-dev:"$architecture"=1.9.1-1; \
+                  libpcsclite-dev:"$architecture"=1.9.9-2; \
               done
 
 FROM          --platform=$BUILDPLATFORM $FROM_REGISTRY/$FROM_IMAGE_BUILDER                                              AS fetcher-step-cli
 
 ARG           GIT_REPO=github.com/smallstep/cli
-ARG           GIT_VERSION=v0.18.2
-ARG           GIT_COMMIT=93151e282d022f2a01513254de1a8a4768609c8e
+ARG           GIT_VERSION=v0.25.2
+ARG           GIT_COMMIT=4f55cda9ed13d64c70a6e0b17e06ab600c73831a
 
 ENV           WITH_BUILD_SOURCE="./cmd/step"
 ENV           WITH_BUILD_OUTPUT="step"
@@ -82,7 +80,7 @@ RUN           git clone --recurse-submodules https://"$GIT_REPO" .; git checkout
 RUN           echo "replace github.com/micromdm/scep/v2 v2.0.0 => github.com/micromdm/scep/v2 v2.1.0" >> go.mod
 RUN           --mount=type=secret,id=CA \
               --mount=type=secret,id=NETRC \
-              go mod tidy
+              go mod tidy -compat=1.17
 
 RUN           --mount=type=secret,id=CA \
               --mount=type=secret,id=NETRC \
@@ -197,7 +195,7 @@ RUN           --mount=type=secret,uid=100,id=CA \
               --mount=type=secret,id=APT_SOURCES \
               --mount=type=secret,id=APT_CONFIG \
               apt-get update -qq && apt-get install -qq --no-install-recommends \
-                libnss-mdns=0.14.1-2 && \
+                libnss-mdns=0.15.1-3 && \
               apt-get -qq autoremove      && \
               apt-get -qq clean           && \
               rm -rf /var/lib/apt/lists/* && \
@@ -237,7 +235,7 @@ RUN           --mount=type=secret,uid=100,id=CA \
               --mount=type=secret,id=APT_SOURCES \
               --mount=type=secret,id=APT_CONFIG \
               apt-get update -qq && apt-get install -qq --no-install-recommends \
-                  libnss-mdns=0.14.1-2 && \
+                  libnss-mdns=0.15.1-3 && \
               apt-get -qq autoremove      && \
               apt-get -qq clean           && \
               rm -rf /var/lib/apt/lists/* && \
@@ -276,10 +274,13 @@ ENV           ADDITIONAL_DOMAINS=""
 # - figure out performance impact of TLS over buildtime
 ENV           TLS=""
 # "internal"
-# Either require_and_verify or verify_if_given
+
+### Mutual TLS ###
 ENV           MTLS_ENABLED=true
+# Either require_and_verify or verify_if_given
 ENV           MTLS_MODE="verify_if_given"
 ENV           ADVANCED_MTLS_TRUST="/certs/pki/authorities/local/root.crt"
+
 # Issuer name to appear in certificates
 #ENV           TLS_ISSUER="Dubo Dubon Duponey"
 # Either disable_redirects or ignore_loaded_certs if one wants the redirects
@@ -294,15 +295,15 @@ ENV           AUTH_PASSWORD="cmVwbGFjZV9tZV93aXRoX3NvbWV0aGluZwo="
 
 ### mDNS broadcasting
 # Whether to enable MDNS broadcasting or not
-ENV           MDNS_ENABLED=true
+ENV           MOD_MDNS_ENABLED=true
 # Type to advertise
-ENV           MDNS_TYPE="_$_SERVICE_TYPE._tcp"
+ENV           MOD_MDNS_TYPE="_$_SERVICE_TYPE._tcp"
 # Name is used as a short description for the service
-ENV           MDNS_NAME="$_SERVICE_NICK mDNS display name"
-# The service will be annonced and reachable at $MDNS_HOST.local (set to empty string to disable mDNS announces entirely)
-ENV           MDNS_HOST="$_SERVICE_NICK"
+ENV           MOD_MDNS_NAME="$_SERVICE_NICK mDNS display name"
+# The service will be annonced and reachable at $MOD_MDNS_HOST.local (set to empty string to disable mDNS announces entirely)
+ENV           MOD_MDNS_HOST="$_SERVICE_NICK"
 # Also announce the service as a workstation (for example for the benefit of coreDNS mDNS)
-ENV           MDNS_STATION=true
+ENV           ADVANCED_MOD_MDNS_STATION=true
 
 # Caddy certs will be stored here
 VOLUME        /certs

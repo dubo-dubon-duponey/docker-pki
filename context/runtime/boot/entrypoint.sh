@@ -4,18 +4,18 @@ set -o errexit -o errtrace -o functrace -o nounset -o pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]:-$PWD}")" 2>/dev/null 1>&2 && pwd)"
 readonly root
 # shellcheck source=/dev/null
-source "$root/helpers.sh"
+. "$root/helpers.sh"
 # shellcheck source=/dev/null
-source "$root/mdns.sh"
+. "$root/mdns.sh"
 
 helpers::dir::writable /tmp
 helpers::dir::writable /data
 
 # mDNS blast if asked to
-[ "${MDNS_ENABLED:-}" != true ] || {
-  [ ! "${MDNS_STATION:-}" ] || mdns::records::add "_workstation._tcp" "$MDNS_HOST" "${MDNS_NAME:-}" "$PORT"
-  mdns::records::add "${MDNS_TYPE:-_http._tcp}" "$MDNS_HOST" "${MDNS_NAME:-}" "$PORT"
-  mdns::records::broadcast &
+[ "${MOD_MDNS_ENABLED:-}" != true ] || {
+  [ ! "${MOD_MDNS_STATION:-}" ] || mdns::records::add "_workstation._tcp" "$MOD_MDNS_HOST" "${MOD_MDNS_NAME:-}" "$PORT"
+  mdns::records::add "${MOD_MDNS_TYPE:-_http._tcp}" "$MOD_MDNS_HOST" "${MOD_MDNS_NAME:-}" "$PORT"
+  mdns::start::broadcaster
 }
 
 export STEPPATH=/data/step
@@ -42,10 +42,10 @@ step::root::fingerprint(){
   CA_NAME=dbdbdp
   PROVISIONER=root@ca.local
   # Password is used both by the root and the intermediate?
-  step::init "$PROVISIONER_PASSWORD" "$CA_NAME" "$MDNS_HOST.local" ":$PORT" "$PROVISIONER"
-#  step ca init --deployment-type=standalone --name "$CA_NAME" --dns "$MDNS_HOST".local --address=:"$PORT" --provisioner=$PROVISIONER --password-file <(echo -n "$PROVISIONER_PASSWORD")
+  step::init "$PROVISIONER_PASSWORD" "$CA_NAME" "$MOD_MDNS_HOST.local" ":$PORT" "$PROVISIONER"
+#  step ca init --deployment-type=standalone --name "$CA_NAME" --dns "$MOD_MDNS_HOST".local --address=:"$PORT" --provisioner=$PROVISIONER --password-file <(echo -n "$PROVISIONER_PASSWORD")
 }
 
-[ "${MDNS_NSS_ENABLED:-}" != true ] || mdns::resolver::start
+[ "${MOD_MDNS_NSS_ENABLED:-}" != true ] || mdns::start::avahi
 
 exec step-ca "$(step path)"/config/ca.json --password-file <(echo -n "$PROVISIONER_PASSWORD") "$@"
