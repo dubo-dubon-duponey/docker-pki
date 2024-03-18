@@ -128,6 +128,24 @@ ENV           GOARCH=$TARGETARCH
 ENV           CGO_CFLAGS="${CFLAGS:-} ${ENABLE_PIE:+-fPIE}"
 ENV           GOFLAGS="-trimpath ${ENABLE_PIE:+-buildmode=pie} ${GOFLAGS:-}"
 
+RUN           --mount=type=secret,uid=100,id=CA \
+              --mount=type=secret,uid=100,id=CERTIFICATE \
+              --mount=type=secret,uid=100,id=KEY \
+              --mount=type=secret,uid=100,id=GPG.gpg \
+              --mount=type=secret,id=NETRC \
+              --mount=type=secret,id=APT_SOURCES \
+              --mount=type=secret,id=APT_CONFIG \
+              apt-get update -qq; \
+              for architecture in arm64 amd64; do \
+                apt-get install -qq --no-install-recommends \
+                  pkg-config:"$architecture"=1.8.1-1; \
+              done; \
+              apt-get -qq autoremove; \
+              apt-get -qq clean; \
+              rm -rf /var/lib/apt/lists/*; \
+              rm -rf /tmp/*; \
+              rm -rf /var/tmp/*
+
 RUN           export GOARM="$(printf "%s" "$TARGETVARIANT" | tr -d v)"; \
               [ "${CGO_ENABLED:-}" != 1 ] || { \
                 eval "$(dpkg-architecture -A "$(echo "$TARGETARCH$TARGETVARIANT" | sed -e "s/^armv6$/armel/" -e "s/^armv7$/armhf/" -e "s/^ppc64le$/ppc64el/" -e "s/^386$/i386/")")"; \
@@ -195,6 +213,7 @@ RUN           --mount=type=secret,uid=100,id=CA \
               --mount=type=secret,id=APT_SOURCES \
               --mount=type=secret,id=APT_CONFIG \
               apt-get update -qq && apt-get install -qq --no-install-recommends \
+                avahi-daemon=0.8-10 \
                 libnss-mdns=0.15.1-3 && \
               apt-get -qq autoremove      && \
               apt-get -qq clean           && \
@@ -213,7 +232,6 @@ COPY          --from=builder-step-cli        /dist /dist
 RUN           patchelf --set-rpath '/boot/lib' /dist/boot/bin/step-ca
 RUN           setcap 'cap_net_bind_service+ep' /dist/boot/bin/step-ca
 RUN           cp /usr/sbin/avahi-daemon                 /dist/boot/bin
-RUN           setcap 'cap_chown+ei cap_dac_override+ei' /dist/boot/bin/avahi-daemon
 
 RUN           chmod 555 /dist/boot/bin/*; \
               epoch="$(date --date "$BUILD_CREATED" +%s)"; \
@@ -243,7 +261,7 @@ RUN           --mount=type=secret,uid=100,id=CA \
               rm -rf /var/tmp/*
 
 # Deviate avahi temporary files into /tmp (there is a socket, so, probably need exec)
-RUN           ln -s "$XDG_STATE_HOME"/avahi-daemon /run
+RUN           mkdir -p "$XDG_RUNTIME_DIR"/avahi-daemon; ln -s "$XDG_RUNTIME_DIR"/avahi-daemon /run; chown avahi:avahi /run/avahi-daemon; chmod 777 /run/avahi-daemon
 
 # Not convinced this is necessary
 # sed -i "s/hosts:.*/hosts:          files mdns4 dns/g" /etc/nsswitch.conf \
@@ -252,65 +270,47 @@ COPY          --from=builder --chown=$BUILD_UID:root /dist /
 
 USER          dubo-dubon-duponey
 
-# Current config below is full-blown regular caddy config, which is only partly useful here
-# since caddy only role is to provide and renew TLS certificates
 ENV           PROVISIONER_PASSWORD=""
+ENV           SERVICE_NICK="pki"
+ENV           SERVICE_TYPE="_http._tcp"
 
 ### Front server configuration
 # Port to use
 ENV           PORT=443
-EXPOSE        443
-# Log verbosity for
+
+#####
+# Global
+#####
+# Log verbosity (debug, info, warn, error, fatal)
 ENV           LOG_LEVEL="warn"
-# Domain name to serve
-ENV           DOMAIN="$_SERVICE_NICK.local"
-ENV           ADDITIONAL_DOMAINS=""
 
-
-# Control wether tls is going to be "internal" (eg: self-signed), or alternatively an email address to enable letsencrypt
-# XXX disable by default for now until:
-# - figure out a better solution that misusing caddy to manage and rotate the certs
-# - figure out buildkit behavior wrt cert rotation (bounce?)
-# - figure out performance impact of TLS over buildtime
-ENV           TLS=""
-# "internal"
-
-### Mutual TLS ###
-ENV           MTLS_ENABLED=true
-# Either require_and_verify or verify_if_given
-ENV           MTLS_MODE="verify_if_given"
-ENV           ADVANCED_MTLS_TRUST="/certs/pki/authorities/local/root.crt"
-
-# Issuer name to appear in certificates
-#ENV           TLS_ISSUER="Dubo Dubon Duponey"
-# Either disable_redirects or ignore_loaded_certs if one wants the redirects
-ENV           TLS_AUTO=disable_redirects
-
-ENV           AUTH_ENABLED=false
-# Realm in case access is authenticated
-ENV           AUTH_REALM="My Precious Realm"
-# Provide username and password here (call the container with the "hash" command to generate a properly encrypted password, otherwise, a random one will be generated)
-ENV           AUTH_USERNAME="dubo-dubon-duponey"
-ENV           AUTH_PASSWORD="cmVwbGFjZV9tZV93aXRoX3NvbWV0aGluZwo="
-
-### mDNS broadcasting
-# Whether to enable MDNS broadcasting or not
+#####
+# Mod mDNS
+#####
+# Whether to disable mDNS broadcasting or not
 ENV           MOD_MDNS_ENABLED=true
-# Type to advertise
-ENV           MOD_MDNS_TYPE="_$_SERVICE_TYPE._tcp"
 # Name is used as a short description for the service
-ENV           MOD_MDNS_NAME="$_SERVICE_NICK mDNS display name"
-# The service will be annonced and reachable at $MOD_MDNS_HOST.local (set to empty string to disable mDNS announces entirely)
+ENV           MOD_MDNS_NAME="$_SERVICE_NICK display name"
+# The service will be annonced and reachable at MOD_MDNS_HOST.local
 ENV           MOD_MDNS_HOST="$_SERVICE_NICK"
+
+#####
+# Advanced settings
+#####
+# Service type
+ENV           ADVANCED_MOD_MDNS_TYPE="$_SERVICE_TYPE"
 # Also announce the service as a workstation (for example for the benefit of coreDNS mDNS)
 ENV           ADVANCED_MOD_MDNS_STATION=true
 
+#####
+# Wrap-up
+#####
+EXPOSE        443
+
 # Caddy certs will be stored here
 VOLUME        /certs
-
 # Caddy uses this
 VOLUME        /tmp
-
 # Used by the backend service
 VOLUME        /data
 

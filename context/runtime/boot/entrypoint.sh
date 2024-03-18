@@ -10,11 +10,13 @@ readonly root
 
 helpers::dir::writable /tmp
 helpers::dir::writable /data
+# /tmp/runtime
+helpers::dir::writable "$XDG_RUNTIME_DIR/avahi-daemon"
 
 # mDNS blast if asked to
 [ "${MOD_MDNS_ENABLED:-}" != true ] || {
   [ ! "${MOD_MDNS_STATION:-}" ] || mdns::records::add "_workstation._tcp" "$MOD_MDNS_HOST" "${MOD_MDNS_NAME:-}" "$PORT"
-  mdns::records::add "${MOD_MDNS_TYPE:-_http._tcp}" "$MOD_MDNS_HOST" "${MOD_MDNS_NAME:-}" "$PORT"
+  mdns::records::add "${ADVANCED_MOD_MDNS_TYPE:-_http._tcp}" "$MOD_MDNS_HOST" "${MOD_MDNS_NAME:-}" "$PORT"
   mdns::start::broadcaster
 }
 
