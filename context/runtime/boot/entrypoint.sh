@@ -8,10 +8,8 @@ readonly root
 # shellcheck source=/dev/null
 . "$root/mdns.sh"
 
-helpers::dir::writable /tmp
-helpers::dir::writable /data
-# /tmp/runtime
-helpers::dir::writable "$XDG_RUNTIME_DIR/avahi-daemon"
+helpers::dir::writable "$XDG_DATA_HOME"
+helpers::dir::writable "$XDG_STATE_HOME/avahi-daemon"
 
 # mDNS blast if asked to
 [ "${MOD_MDNS_ENABLED:-}" != true ] || {
@@ -20,7 +18,7 @@ helpers::dir::writable "$XDG_RUNTIME_DIR/avahi-daemon"
   mdns::start::broadcaster
 }
 
-export STEPPATH=/data/step
+export STEPPATH="$XDG_DATA_HOME"/step
 
 step::init(){
   local password="$1"
@@ -38,9 +36,9 @@ step::root::fingerprint(){
   step certificate fingerprint "$(step path)"/certs/root_ca.crt
 }
 
-[ -e /data/step ] || {
+[ -e "$(step path)" ] || {
   printf >&2 "Need to initialize the CA\n"
-  #printf "%s" "$PROVISIONER_PASSWORD" > /data/provisioner_password_file
+  #printf "%s" "$PROVISIONER_PASSWORD" > /magnetar/user/data/provisioner_password_file
   CA_NAME=dbdbdp
   PROVISIONER=root@ca.local
   # Password is used both by the root and the intermediate?

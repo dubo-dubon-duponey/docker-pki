@@ -1,9 +1,9 @@
 ARG           FROM_REGISTRY=docker.io/dubodubonduponey
 
-ARG           FROM_IMAGE_BUILDER=base:builder-bookworm-2024-03-01
-ARG           FROM_IMAGE_AUDITOR=base:auditor-bookworm-2024-03-01
-ARG           FROM_IMAGE_RUNTIME=base:runtime-bookworm-2024-03-01
-ARG           FROM_IMAGE_TOOLS=tools:linux-bookworm-2024-03-01
+ARG           FROM_IMAGE_BUILDER=base:builder-bookworm-2025-05-01
+ARG           FROM_IMAGE_AUDITOR=base:auditor-bookworm-2025-05-01
+ARG           FROM_IMAGE_RUNTIME=base:runtime-bookworm-2025-05-01
+ARG           FROM_IMAGE_TOOLS=tools:linux-bookworm-2025-05-01
 
 FROM          $FROM_REGISTRY/$FROM_IMAGE_TOOLS                                                                          AS builder-tools
 
@@ -25,8 +25,8 @@ RUN           --mount=type=secret,id=CA \
 FROM          --platform=$BUILDPLATFORM $FROM_REGISTRY/$FROM_IMAGE_BUILDER                                              AS fetcher-step
 
 ARG           GIT_REPO=github.com/smallstep/certificates
-ARG           GIT_VERSION=v0.25.2
-ARG           GIT_COMMIT=7bfe11c68723194a583108e6cf984573459bda1e
+ARG           GIT_VERSION=v0.28.3
+ARG           GIT_COMMIT=0cf1c5688708ec4a910c007d7f151c617b722268
 
 ENV           WITH_BUILD_SOURCE="./cmd/step-ca"
 ENV           WITH_BUILD_OUTPUT="step-ca"
@@ -56,7 +56,7 @@ RUN           --mount=type=secret,uid=100,id=CA \
               --mount=type=secret,id=APT_SOURCES \
               --mount=type=secret,id=APT_CONFIG \
               apt-get update -qq; \
-              apt-get install -qq --no-install-recommends ninja-build=1.11.1-1; \
+              apt-get install -qq --no-install-recommends ninja-build=1.11.1-2~deb12u1; \
               for architecture in arm64 amd64; do \
                 apt-get install -qq --no-install-recommends \
                   libpcsclite-dev:"$architecture"=1.9.9-2; \
@@ -65,8 +65,8 @@ RUN           --mount=type=secret,uid=100,id=CA \
 FROM          --platform=$BUILDPLATFORM $FROM_REGISTRY/$FROM_IMAGE_BUILDER                                              AS fetcher-step-cli
 
 ARG           GIT_REPO=github.com/smallstep/cli
-ARG           GIT_VERSION=v0.25.2
-ARG           GIT_COMMIT=4f55cda9ed13d64c70a6e0b17e06ab600c73831a
+ARG           GIT_VERSION=v0.28.6
+ARG           GIT_COMMIT=ea5f95efa74d45f07431199ef693e0e78969c610
 
 ENV           WITH_BUILD_SOURCE="./cmd/step"
 ENV           WITH_BUILD_OUTPUT="step"
@@ -213,7 +213,7 @@ RUN           --mount=type=secret,uid=100,id=CA \
               --mount=type=secret,id=APT_SOURCES \
               --mount=type=secret,id=APT_CONFIG \
               apt-get update -qq && apt-get install -qq --no-install-recommends \
-                avahi-daemon=0.8-10 \
+                avahi-daemon=0.8-10+deb12u1 \
                 libnss-mdns=0.15.1-3 && \
               apt-get -qq autoremove      && \
               apt-get -qq clean           && \
@@ -253,6 +253,7 @@ RUN           --mount=type=secret,uid=100,id=CA \
               --mount=type=secret,id=APT_SOURCES \
               --mount=type=secret,id=APT_CONFIG \
               apt-get update -qq && apt-get install -qq --no-install-recommends \
+                  avahi-daemon=0.8-10+deb12u1 \
                   libnss-mdns=0.15.1-3 && \
               apt-get -qq autoremove      && \
               apt-get -qq clean           && \
@@ -261,7 +262,7 @@ RUN           --mount=type=secret,uid=100,id=CA \
               rm -rf /var/tmp/*
 
 # Deviate avahi temporary files into /tmp (there is a socket, so, probably need exec)
-RUN           mkdir -p "$XDG_RUNTIME_DIR"/avahi-daemon; ln -s "$XDG_RUNTIME_DIR"/avahi-daemon /run; chown avahi:avahi /run/avahi-daemon; chmod 777 /run/avahi-daemon
+RUN           mkdir -p "$XDG_STATE_HOME"/avahi-daemon; ln -s "$XDG_STATE_HOME"/avahi-daemon /run; chown avahi:avahi /run/avahi-daemon; chmod 777 /run/avahi-daemon
 
 # Not convinced this is necessary
 # sed -i "s/hosts:.*/hosts:          files mdns4 dns/g" /etc/nsswitch.conf \
@@ -307,12 +308,8 @@ ENV           ADVANCED_MOD_MDNS_STATION=true
 #####
 EXPOSE        443
 
-# Caddy certs will be stored here
-VOLUME        /certs
-# Caddy uses this
-VOLUME        /tmp
-# Used by the backend service
-VOLUME        /data
+VOLUME        "$XDG_DATA_HOME"
+VOLUME        "$XDG_STATE_HOME"
 
 ENV           HEALTHCHECK_URL="tcp://127.0.0.1:$PORT"
 
